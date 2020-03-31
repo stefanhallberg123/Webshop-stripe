@@ -8,8 +8,11 @@
   },
   "scripts": {
     "test": "mocha",
-    "start": "nodemon index.js & node-sass -w sass -o public",
+    "start": "node index.js",
     "scss": "node-sass --watch sass -o public"
+  },
+  "engines": {
+    "node": "10.16.3"
   },
   "repository": {
     "type": "git",
@@ -27,6 +30,7 @@
     "ejs": "^3.0.1",
     "express": "^4.17.1",
     "express-validator": "^6.4.0",
+    "heroku": "^7.39.2",
     "install": "^0.13.0",
     "jsonwebtoken": "^8.5.1",
     "mongodb": "^3.5.4",
