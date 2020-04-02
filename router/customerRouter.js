@@ -65,9 +65,11 @@ const userVIEW = {
     prodgenerator: "/partial/prodgenerator"
 };
 
+
 // customer main \\
-router.get(userROUTE.main, (req, res) => {
-    res.render(userVIEW.main);
+router.get(userROUTE.main, async (req, res) => {
+    const findUser = await User.find();
+    res.render(userVIEW.main, { findUser });
 });
 
 // customer course \\
