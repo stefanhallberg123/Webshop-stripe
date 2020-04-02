@@ -9,8 +9,8 @@ const crypto = require("crypto");
 const verifyToken = require("./verifyToken");
 const sendGridTransport = require("nodemailer-sendgrid-transport");
 const config = require("../config/config");
-
-
+require("dotenv").config({ path: "./.env" });
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY)
 // middleware  \\
 const router = express();
 //Api-nyckeln för SendGrid är rätt men SendGrid vill inte accepterat vår nyckel. Har även skapat flera olika nycklar men dessa blev inte godkända. Alla i gruppen har testat men koderna fungerar ej. Testat med flera olika sätt. Algoritmerna är rätt. 
@@ -35,7 +35,6 @@ const userROUTE = {
     welcome: "/welcome",
     settings: "/settings",
     settingparams: "/settings/:id",
-    orders: "/orders",
     logout: "/logout",
     thankyou: "/thankyou",
     delete: "/delete/:id",
@@ -44,7 +43,10 @@ const userROUTE = {
     prodgenerator: "/prodgenerator",
     wishlist: "/wishlist",
     wishlistid: "/wishlist/:id",
-    deletewishlist: "/deletewishlist/:id"
+    deletewishlist: "/deletewishlist/:id",
+    checkoutid: "/checkout/:id",
+    deletecheckout: "/deletecheckout/:id"
+
 };
 
 const userVIEW = {
@@ -54,14 +56,12 @@ const userVIEW = {
     login: "login",
     signup: "signup",
     welcome: "welcome",
-    orders: "orders",
     settings: "settings",
-    orders: "orders",
     thankyou: "thankyou",
     reset: "reset",
     resetform: "resetform",
     wishlist: "wishlist",
-
+    checkoutid: "/checkout/:id",
     prodgenerator: "/partial/prodgenerator"
 };
 
@@ -89,12 +89,39 @@ router.get(userROUTE.course, async (req, res) => {
         currentPage
     });
 });
-
-// customer checkout \\
-router.get(userROUTE.checkout, (req, res) => {
-    res.render(userVIEW.checkout);
+router.get(userROUTE.checkout, verifyToken, async (req, res) => {
+    const user = await User.findOne({ _id: req.body.user._id }).populate("checkout.productId");
+    return stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: user.checkout.map((product) => {
+            return {
+                name: product.productId.title,
+                amount: product.productId.price * 100,
+                quantity: 1,
+                currency: "sek",
+            }
+        }),
+        success_url: req.protocol + "://" + req.get("Host") + "/",
+        cancel_url: "http://localhost:8003/course"
+    }).then((session) => {
+        res.render(userVIEW.checkout, { user, sessionId: session.id })
+    });
 });
 
+
+router.get(userROUTE.checkoutid, verifyToken, async (req, res) => {
+    const product = await productItem.findOne({ _id: req.params.id })
+    const user = await User.findOne({ _id: req.body.user._id })
+    await user.addToCheckout(product)
+    res.redirect(userROUTE.checkout);
+});
+
+router.get(userROUTE.deletecheckout, verifyToken, async (req, res) => {
+    const user = await User.findOne({ _id: req.body.user._id })
+
+    user.removeFromCheckOutList(req.params.id)
+    res.redirect(userROUTE.course);
+});
 
 // customer signup \\
 router.get(userROUTE.signup, async (req, res) => {
@@ -163,14 +190,12 @@ router.get(userROUTE.welcome, (req, res) => {
 // customer wishlist \\
 router.get(userROUTE.wishlist, verifyToken, async (req, res) => {
     const user = await User.findOne({ _id: req.body.user._id }).populate("wishlist.productId")
-    console.log(user)
     res.render(userVIEW.wishlist, { user });
 });
 
 router.get(userROUTE.wishlistid, verifyToken, async (req, res) => {
     const product = await productItem.findOne({ _id: req.params.id })
     const user = await User.findOne({ _id: req.body.user._id })
-    console.log(req.body.user)
     await user.addToWishlist(product)
     res.redirect(userROUTE.wishlist);
 });
@@ -197,14 +222,10 @@ router.post(userROUTE.settings, async (req, res) => {
         user.city = req.body.city,
         user.password = req.body.password,
         user.confpassword = req.body.confpassword
-    console.log(user);
     await user.save();
 });
 
-// customer orders \\
-router.get(userROUTE.orders, (req, res) => {
-    res.render(userVIEW.orders);
-});
+// customer checkout \\
 
 
 // customer thankyou \\
